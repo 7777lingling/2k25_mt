@@ -1,0 +1,51 @@
+{
+    "image_paths": {
+        "mycareer": "image1/MyCAREER.png",
+        "myteam": "image1/MyTEAM.png",
+        "new_content": "image1/new_content.png",        
+        "match": "image1/match.png",
+        "daily_reward": "image1/daily_reward.png",
+        "domination_home": "image1/domination_home.png",
+        "domination_btn": "image1/domination_btn.png",
+        "select": "image1/select.png",
+        "stars": "image1/stars.png",
+        "stars2": "image1/stars2.png",
+        "three_stars_complete": "image1/three_stars_complete.png",  
+        "continue": "image2/continue.png",
+        "forward": "image2/forward.png",
+        "pause": "image2/pause.png"
+    },
+    "thresholds": {
+        "mycareer": 1.0,
+        "myteam": 1.0,
+        "new_content": 1.0,
+        "daily_reward": 1.0,
+        "domination_home": 1.0,
+        "domination_btn": 1.0,
+        "select": 1.0,
+        "stars": 0.998,
+        "stars2": 0.998,
+        "match": 1.0,
+        "forward": 1.0,
+        "pause": 0.9,
+        "continue": 1.0,
+        "three_stars_complete": 1.0
+    },
+    "priority": [
+        "mycareer",
+        "myteam",
+        "daily_reward",
+        "new_content",
+        "domination_home",
+        "domination_btn",
+        "select",
+        "stars",
+        "stars2",
+        "match",
+        "forward",
+        "pause",
+        "continue",
+        "three_stars_complete",
+        "pause"
+    ]
+} 
