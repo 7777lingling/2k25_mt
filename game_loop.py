@@ -12,9 +12,20 @@ import traceback
 import json
 from pathlib import Path
 
-def setup_logging():
+def setup_logging():   #日志設置
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
+    
+    # 限制日志文件数量
+    MAX_LOG_FILES = 5
+    log_files = sorted(log_dir.glob("game_log_*.log"), key=lambda x: x.stat().st_mtime, reverse=True)
+    
+    # 删除旧的日志文件
+    for old_log in log_files[MAX_LOG_FILES-1:]:
+        try:
+            old_log.unlink()
+        except Exception as e:
+            print(f"无法删除旧日志文件 {old_log}: {e}")
     
     current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = log_dir / f"game_log_{current_time}.log"
@@ -23,25 +34,25 @@ def setup_logging():
     date_format = '%Y-%m-%d %H:%M:%S'
     
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)
+    root_logger.setLevel(logging.INFO)  # 将日志级别改为INFO
     
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
     
     file_handler = logging.FileHandler(log_file, encoding='utf-8')
-    file_handler.setLevel(logging.DEBUG)
+    file_handler.setLevel(logging.INFO)  # 将文件处理器的级别改为INFO
     file_handler.setFormatter(logging.Formatter(log_format, date_format))
     root_logger.addHandler(file_handler)
     
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
+    console_handler.setLevel(logging.INFO)  # 将控制台处理器的级别改为INFO
     console_handler.setFormatter(logging.Formatter('%(message)s'))
     root_logger.addHandler(console_handler)
     
     logging.info("遊戲啟動")
     return log_file
 
-class GameWindow:
+class GameWindow:   #遊戲視窗
     def __init__(self, window_name="NBA 2K25"):
         self.window_name = window_name
         self.hwnd = None
@@ -80,7 +91,7 @@ class GameWindow:
             return None
 
 class GameState:
-    def __init__(self):
+    def __init__(self): #遊戲狀態
         self.states = {
             'in_myteam': False,
             'in_domination': False,
@@ -108,7 +119,7 @@ class GameState:
         }
 
 class GameLoop:
-    def __init__(self):
+    def __init__(self): #遊戲循環
         self.is_running = False
         self.window_name = "NBA 2K25"
         self.logger = logging.getLogger(__name__)
@@ -171,7 +182,7 @@ class GameLoop:
         except Exception as e:
             self.logger.error(f"按鍵操作出錯: {str(e)}")
 
-    def detect_image(self, image_name, threshold=None):#圖片檢測
+    def detect_image(self, image_name, threshold=None):
         """檢測圖片"""
         if not os.path.exists(image_name):
             self.logger.error(f"圖片不存在: {image_name}")
@@ -196,10 +207,18 @@ class GameLoop:
             debug_dir = Path("debug")
             debug_dir.mkdir(exist_ok=True)
             
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            cv2.imwrite(str(debug_dir / f"{timestamp}_{Path(image_name).stem}_screen.png"), screenshot)
-            cv2.imwrite(str(debug_dir / f"{timestamp}_{Path(image_name).stem}_template.png"), template)
+            # 限制调试图片数量
+            MAX_DEBUG_FILES = 50
+            debug_files = sorted(debug_dir.glob("*.png"), key=lambda x: x.stat().st_mtime, reverse=True)
             
+            # 删除旧的调试图片
+            for old_file in debug_files[MAX_DEBUG_FILES-1:]:
+                try:
+                    old_file.unlink()
+                except Exception as e:
+                    self.logger.warning(f"無法刪除舊調試圖片 {old_file}: {e}")
+            
+            # 只在匹配分数较高时保存调试图片
             best_val = -1
             max_loc = None
             
@@ -213,10 +232,14 @@ class GameLoop:
                     max_loc = curr_max_loc if method != cv2.TM_SQDIFF_NORMED else min_loc
             
             threshold = threshold if threshold is not None else self.thresholds.get(Path(image_name).stem, 0.8)
-            self.logger.info(f"檢測圖片 {Path(image_name).stem} - 分數: {best_val:.3f} - 閾值: {threshold:.3f}")
+            
+            # 只在匹配分数接近阈值时记录日志
+            if abs(best_val - threshold) < 0.1:
+                self.logger.info(f"檢測圖片 {Path(image_name).stem} - 分數: {best_val:.3f} - 閾值: {threshold:.3f}")
             
             if best_val >= (threshold - 0.001):
-                self.logger.info(f"匹配成功 - {Path(image_name).stem} - {best_val:.3f}")
+                # 只在成功匹配时保存调试图片
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 h, w = template.shape[:2]
                 top_left = max_loc
                 bottom_right = (top_left[0] + w, top_left[1] + h)
@@ -225,14 +248,13 @@ class GameLoop:
                 cv2.imwrite(str(debug_dir / f"{timestamp}_{Path(image_name).stem}_match.png"), match_img)
                 return True, max_loc
             
-            self.logger.info(f"匹配失敗 - {Path(image_name).stem} - {best_val:.3f}")
             return False, None
                 
         except Exception as e:
             self.logger.error(f"圖片匹配出錯: {str(e)}")
             return False, None
 
-    def handle_matched_image(self, image_name):#圖片處理
+    def handle_matched_image(self, image_name):#遊戲處理
         image_name = Path(image_name).stem.lower()
         
         if image_name == "new_content":
@@ -248,7 +270,12 @@ class GameLoop:
             self.press_and_release(self.KEYS["SPACE"])
             self.state.set(in_domination=True)
             time.sleep(3)
-            if self.detect_image(self.paths["select"], threshold=1.0)[0]:
+            
+            # 先檢查是否有滿星
+            self.check_full_stars()
+            
+            # 檢查選擇按鈕
+            if self.detect_image(self.paths["select"], threshold=self.thresholds["select"])[0]:
                 self.logger.info("檢測到選擇按鈕")
                 self.press_and_release(self.KEYS["SPACE"])
                 time.sleep(1)
@@ -305,18 +332,22 @@ class GameLoop:
     def check_three_stars(self):#三星檢查
         self.logger.info("檢查三星...")
         # 檢查第一個三星圖片
-        result1 = self.detect_image(self.paths["stars"], threshold=0.990)
+        result1 = self.detect_image(self.paths["stars"], threshold=self.thresholds["stars"])
         # 檢查第二個三星圖片
-        result2 = self.detect_image(self.paths["stars2"], threshold=0.990)
+        result2 = self.detect_image(self.paths["stars2"], threshold=self.thresholds["stars2"])
+        # 檢查第三個三星圖片
+        result3 = self.detect_image(self.paths["stars3"], threshold=self.thresholds["stars3"])
+        # 檢查第四個三星圖片
+        result4 = self.detect_image(self.paths["stars4"], threshold=self.thresholds["stars4"])
         
         # 如果任意一個匹配成功就返回True
-        if result1[0] or result2[0]:
+        if result1[0] or result2[0] or result3[0] or result4[0]:
             self.logger.info(f"找到三星！")
             return True
             
         return False
 
-    def press_key_and_check_stars(self, key, times):#按鍵檢查
+    def press_key_and_check_stars(self, key, times):#三星按鍵檢查
         self.logger.info(f"按{times}次按鍵並檢查三星")
         for i in range(times):
             self.press_and_release(key)
@@ -324,6 +355,49 @@ class GameLoop:
             if self.check_three_stars():
                 self.logger.info("按鍵檢查時找到三星")
                 return True
+        return False
+
+    def check_and_trigger_game(self, message="找到三星！"):#檢查三星並開始遊戲
+        """檢查是否有三星並觸發遊戲開始"""
+        if self.check_three_stars():
+            self.logger.info(f"{message}準備開始遊戲")
+            self.state.set(search_count=0)
+            self.trigger_game_start()
+            return True
+        return False
+        
+    def press_key_sequence(self, key, times, pause=0.3):#多次按鍵
+        """按指定鍵多次"""
+        for _ in range(times):
+            self.press_and_release(key)
+            time.sleep(pause)
+    
+    def navigate_and_check(self, direction_key, description):#導航檢查
+        """導航並檢查三星"""
+        self.logger.info(f"按{description}鍵")
+        self.press_key_sequence(direction_key, 1)
+        
+        # 檢查三星
+        if self.check_and_trigger_game():
+            return True
+            
+        # 向上導航
+        self.logger.info("按W鍵")
+        self.press_key_sequence(self.KEYS["W"], 5)
+        
+        # 再次檢查
+        if self.check_and_trigger_game():
+            return True
+            
+        # 向下導航
+        self.logger.info("按S鍵")
+        if self.press_key_and_check_stars(self.KEYS["S"], 5):
+            self.logger.info("找到三星！準備開始遊戲")
+            self.state.set(search_count=0)                
+            time.sleep(1)
+            self.trigger_game_start()
+            return True
+            
         return False
 
     def handle_three_stars_search(self):#三星搜尋
@@ -336,57 +410,32 @@ class GameLoop:
             self.state.set(search_count=search_count)
             self.logger.info(f"\n第 {search_count} 次搜尋開始...")
             
-            if search_count > 2:
-                self.logger.info("搜尋超過2次，準備切換下一個")
-                self.logger.info("按ESC返回")
+            # 先向左導航檢查
+            if self.navigate_and_check(self.KEYS["LEFT"], "左"):
+                continue
+                
+            # 再向右導航檢查
+            if self.navigate_and_check(self.KEYS["RIGHT"], "右"):
+                continue
+            
+            # 最後檢查一次
+            if self.check_and_trigger_game("最後檢查，"):
+                continue
+            
+            # 本次搜索失敗，判斷是否需要換下一個
+            self.logger.info("本次搜尋失敗")
+            
+            if search_count >= 2:
+                self.logger.info("已搜尋2次，準備切換下一個")
                 self.press_and_release(self.KEYS["ESC"])
                 time.sleep(0.5)
-                self.logger.info("按右鍵切換")
                 self.press_and_release(self.KEYS["RIGHT"])
                 time.sleep(0.5)
-                self.logger.info("按空格確認")
                 self.press_and_release(self.KEYS["SPACE"])
                 self.state.set(search_count=0)
                 self.logger.info("重置搜尋次數為0")
             
-            self.logger.info("按一次左鍵")
-            for _ in range(1):
-                self.press_and_release(self.KEYS["LEFT"])
-                time.sleep(0.3)
-                
-            self.logger.info("按5次W鍵")
-            for i in range(5):
-                self.press_and_release(self.KEYS["W"])
-                time.sleep(0.3)
-            
-            self.logger.info("檢查當前畫面是否有三星")
-            if self.check_three_stars():
-                self.logger.info("找到三星！準備開始遊戲")
-                self.state.set(search_count=0)
-                self.trigger_game_start()
-                continue
-            
-            self.logger.info("按S鍵並檢查三星")
-            if self.press_key_and_check_stars(self.KEYS["S"], 5):
-                self.logger.info("找到三星！準備開始遊戲")
-                self.state.set(search_count=0)                
-                time.sleep(1)
-                self.trigger_game_start()
-                continue
-
-            self.logger.info("按一次右鍵")
-            for _ in range(1):
-                self.press_and_release(self.KEYS["RIGHT"])
-                time.sleep(0.3)
-            
-            self.logger.info("最後檢查三星")
-            if self.check_three_stars():
-                self.logger.info("找到三星！準備開始遊戲")
-                self.state.set(search_count=0)
-                self.trigger_game_start()
-                continue
-            
-            self.logger.info("本次搜尋結束，等待0.5秒")
+            self.logger.info("等待0.5秒")
             time.sleep(0.5)
 
     def trigger_game_start(self):  # 進入遊戲流程
@@ -415,6 +464,37 @@ class GameLoop:
                 continue
             time.sleep(0.5)
 
+    def check_full_stars(self):#滿星檢查
+        self.logger.info("檢查滿星...")
+        
+        # 初始化連續未找到次數
+        not_found_count = 0
+        max_not_found = 2  # 連續未找到超過2次就退出
+        found_any = False  # 記錄是否找到過任何滿星
+        
+        # 持續查找直到條件滿足
+        while not_found_count <= max_not_found:
+            result = self.detect_image(self.paths["full_of_stars"], threshold=self.thresholds["full_of_stars"])
+            
+            if result[0]:
+                self.logger.info(f"找到滿星！按D鍵切換")
+                self.press_and_release(self.KEYS["RIGHT"])
+                time.sleep(0.5)  # 給更多時間讓畫面更新
+                found_any = True
+                not_found_count = 0  # 重置未找到計數
+            else:
+                not_found_count += 1
+                if not_found_count <= max_not_found:
+                    self.logger.info(f"第{not_found_count}次未找到滿星，繼續嘗試...")
+                    time.sleep(0.3)  # 短暫等待後再次嘗試
+        
+        if found_any:
+            self.logger.info("完成滿星處理，繼續下一步")
+            return True
+        else:
+            self.logger.info(f"連續{not_found_count}次未找到滿星，退出查找")
+            return False
+
     def handle_game_buttons(self): # 進入遊戲循環
         if self.detect_image(self.paths["forward"])[0]:
             self.logger.info("找到前進按鈕，按下空白鍵")
@@ -435,6 +515,8 @@ class GameLoop:
         elif self.check_three_stars():
             self.logger.info("找到三星按鈕，進入三星搜尋")
             self.handle_three_stars_search()
+            return True
+        elif self.check_full_stars():
             return True
             
         self.logger.info("尋找圖片...")
