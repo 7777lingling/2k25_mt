@@ -174,10 +174,10 @@ class GameLoop:
             
         try:
             win32gui.SetForegroundWindow(self.game_window.hwnd)
-            time.sleep(0.1)
+            time.sleep(0.5)
             scan_code = win32api.MapVirtualKey(key, 0)
             win32api.keybd_event(key, scan_code, 0, 0)
-            time.sleep(0.1)
+            time.sleep(0.5)
             win32api.keybd_event(key, scan_code, win32con.KEYEVENTF_KEYUP, 0)
         except Exception as e:
             self.logger.error(f"按鍵操作出錯: {str(e)}")
@@ -260,16 +260,16 @@ class GameLoop:
         if image_name == "new_content":
             self.logger.info("檢測到全新內容")
             self.press_and_release(self.KEYS["E"])
-            time.sleep(1)
+            time.sleep(0.5)
             self.press_and_release(self.KEYS["E"])
-            time.sleep(1)
+            time.sleep(0.5)
             return True
             
         elif image_name == "domination_btn":
             self.logger.info("檢測到稱霸賽按鈕")
             self.press_and_release(self.KEYS["SPACE"])
             self.state.set(in_domination=True)
-            time.sleep(3)
+            time.sleep(0.5)
             
             # 先檢查是否有滿星
             self.check_full_stars()
@@ -278,7 +278,7 @@ class GameLoop:
             if self.detect_image(self.paths["select"], threshold=self.thresholds["select"])[0]:
                 self.logger.info("檢測到選擇按鈕")
                 self.press_and_release(self.KEYS["SPACE"])
-                time.sleep(1)
+                time.sleep(0.5)
                 self.handle_three_stars_search()
             return True
                 
@@ -292,14 +292,14 @@ class GameLoop:
         elif image_name == "mycareer":
             self.logger.info("檢測到MyCAREER")
             self.press_and_release(self.KEYS["RIGHT"])
-            time.sleep(1)
+            time.sleep(0.5)
             return True
             
         elif image_name == "myteam":
             self.logger.info("檢測到MyTEAM")
             self.press_and_release(self.KEYS["SPACE"])
             self.state.set(in_myteam=True)
-            time.sleep(1)
+            time.sleep(0.5)
             return True
             
         elif image_name == "daily_reward":
@@ -394,7 +394,7 @@ class GameLoop:
         if self.press_key_and_check_stars(self.KEYS["S"], 5):
             self.logger.info("找到三星！準備開始遊戲")
             self.state.set(search_count=0)                
-            time.sleep(1)
+            time.sleep(0.5)
             self.trigger_game_start()
             return True
             
@@ -435,7 +435,6 @@ class GameLoop:
                 self.state.set(search_count=0)
                 self.logger.info("重置搜尋次數為0")
             
-            self.logger.info("等待0.5秒")
             time.sleep(0.5)
 
     def trigger_game_start(self):  # 進入遊戲流程
@@ -447,15 +446,15 @@ class GameLoop:
         self.logger.info("按兩次S鍵選擇難度")
         for i in range(2):
             self.press_and_release(self.KEYS["S"])
-            time.sleep(1)        
+            time.sleep(0.5)        
         
         self.logger.info("按空格確認難度")
         self.press_and_release(self.KEYS["SPACE"])
-        time.sleep(1)
+        time.sleep(0.5)
         
         self.logger.info("按空格開始遊戲")
         self.press_and_release(self.KEYS["SPACE"])
-        time.sleep(1)
+        time.sleep(0.5)
 
         # 進入遊戲循環
         self.logger.info("=== 進入遊戲循環 ===")
@@ -499,24 +498,22 @@ class GameLoop:
         if self.detect_image(self.paths["forward"])[0]:
             self.logger.info("找到前進按鈕，按下空白鍵")
             self.press_and_release(self.KEYS["SPACE"])
-            time.sleep(1)
+            time.sleep(0.5)
             return True
         elif self.detect_image(self.paths["pause"])[0]:
             self.logger.info("找到暫停按鈕，按下空白鍵")
             self.press_and_release(self.KEYS["SPACE"])
-            time.sleep(1)
+            time.sleep(0.5)
             return True
         elif self.detect_image(self.paths["continue"])[0]:
             self.logger.info("找到繼續按鈕，按下空白鍵")
             self.press_and_release(self.KEYS["SPACE"])
             self.state.set(in_domination=False)
-            time.sleep(1)
+            time.sleep(0.5)
             return True
         elif self.check_three_stars():
             self.logger.info("找到三星按鈕，進入三星搜尋")
             self.handle_three_stars_search()
-            return True
-        elif self.check_full_stars():
             return True
             
         self.logger.info("尋找圖片...")
