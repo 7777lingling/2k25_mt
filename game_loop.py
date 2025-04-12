@@ -174,11 +174,11 @@ class GameLoop:
             
         try:
             win32gui.SetForegroundWindow(self.game_window.hwnd)
-            time.sleep(0.5)
+            time.sleep(0.1)  # 縮短設置前景窗口等待時間
             scan_code = win32api.MapVirtualKey(key, 0)
-            win32api.keybd_event(key, scan_code, 0, 0)
-            time.sleep(0.5)
-            win32api.keybd_event(key, scan_code, win32con.KEYEVENTF_KEYUP, 0)
+            win32api.keybd_event(key, scan_code, 0, 0)  # 按下鍵
+            time.sleep(0.1)  # 縮短按住時間為0.1秒
+            win32api.keybd_event(key, scan_code, win32con.KEYEVENTF_KEYUP, 0)  # 釋放鍵
         except Exception as e:
             self.logger.error(f"按鍵操作出錯: {str(e)}")
 
@@ -331,19 +331,15 @@ class GameLoop:
 
     def check_three_stars(self):#三星檢查
         self.logger.info("檢查三星...")
-        # 檢查第一個三星圖片
-        result1 = self.detect_image(self.paths["stars"], threshold=self.thresholds["stars"])
-        # 檢查第二個三星圖片
-        result2 = self.detect_image(self.paths["stars2"], threshold=self.thresholds["stars2"])
-        # 檢查第三個三星圖片
-        result3 = self.detect_image(self.paths["stars3"], threshold=self.thresholds["stars3"])
-        # 檢查第四個三星圖片
-        result4 = self.detect_image(self.paths["stars4"], threshold=self.thresholds["stars4"])
         
-        # 如果任意一個匹配成功就返回True
-        if result1[0] or result2[0] or result3[0] or result4[0]:
-            self.logger.info(f"找到三星！")
-            return True
+        # 檢查所有三星圖片
+        star_images = ["stars", "stars2", "stars3", "stars4"]
+        for img_name in star_images:
+            if img_name in self.paths and img_name in self.thresholds:
+                result = self.detect_image(self.paths[img_name], threshold=self.thresholds[img_name])
+                if result[0]:
+                    self.logger.info(f"找到三星！({img_name})")
+                    return True
             
         return False
 
@@ -466,32 +462,32 @@ class GameLoop:
     def check_full_stars(self):#滿星檢查
         self.logger.info("檢查滿星...")
         
-        # 初始化連續未找到次數
-        not_found_count = 0
-        max_not_found = 2  # 連續未找到超過2次就退出
-        found_any = False  # 記錄是否找到過任何滿星
+        # 初始化變數
+        not_found_count = 0  # 連續未找到的次數
+        found_any = False    # 是否找到過任何滿星
+        max_not_found = 3    # 連續幾次未找到就退出
         
-        # 持續查找直到條件滿足
-        while not_found_count <= max_not_found:
+        # 只要連續未找到的次數不超過閾值，就繼續搜索
+        while not_found_count < max_not_found:
             result = self.detect_image(self.paths["full_of_stars"], threshold=self.thresholds["full_of_stars"])
             
             if result[0]:
                 self.logger.info(f"找到滿星！按D鍵切換")
                 self.press_and_release(self.KEYS["RIGHT"])
-                time.sleep(0.5)  # 給更多時間讓畫面更新
+                time.sleep(0.2)  # 給畫面更新時間
                 found_any = True
                 not_found_count = 0  # 重置未找到計數
             else:
                 not_found_count += 1
-                if not_found_count <= max_not_found:
-                    self.logger.info(f"第{not_found_count}次未找到滿星，繼續嘗試...")
-                    time.sleep(0.3)  # 短暫等待後再次嘗試
+                if not_found_count < max_not_found:
+                    self.logger.info(f"第{not_found_count}次未找到滿星，繼續搜索...")
+                    time.sleep(0.2)  # 短暫等待後再次檢測
         
         if found_any:
-            self.logger.info("完成滿星處理，繼續下一步")
+            self.logger.info("完成所有滿星處理")
             return True
         else:
-            self.logger.info(f"連續{not_found_count}次未找到滿星，退出查找")
+            self.logger.info(f"連續{max_not_found}次未找到滿星，退出搜索")
             return False
 
     def handle_game_buttons(self): # 進入遊戲循環
