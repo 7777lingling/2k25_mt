@@ -16,7 +16,8 @@
         "three_stars_complete": "image1/three_stars_complete.png",  
         "continue": "image2/continue.png",
         "forward": "image2/forward.png",
-        "pause": "image2/pause.png"
+        "pause": "image2/pause.png",
+        "99_over": "image2/99_over.png"
     },
     "thresholds": {
         "mycareer": 1.0,
@@ -35,7 +36,8 @@
         "forward": 1.0,
         "pause": 0.9,
         "continue": 1.0,
-        "three_stars_complete": 1.0
+        "three_stars_complete": 1.0,
+        "99_over": 0.990
     },
     "priority": [
         "mycareer",
@@ -55,6 +57,6 @@
         "pause",
         "continue",
         "three_stars_complete",
-        "pause"
+        "99_over"
     ]
 } 

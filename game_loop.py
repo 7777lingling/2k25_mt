@@ -507,6 +507,15 @@ class GameLoop:
             self.state.set(in_domination=False)
             time.sleep(0.5)
             return True
+        elif self.detect_image(self.paths["99_over"])[0]:
+            self.logger.info("找到 99 Overall 圖標，按ESC退出，然後按D再按空格")
+            self.press_and_release(self.KEYS["ESC"])
+            time.sleep(0.5)
+            self.press_and_release(self.KEYS["RIGHT"])  # 按D鍵向右
+            time.sleep(0.5)
+            self.press_and_release(self.KEYS["SPACE"])  # 按空格鍵確認
+            time.sleep(0.5)
+            return True
         elif self.check_three_stars():
             self.logger.info("找到三星按鈕，進入三星搜尋")
             self.handle_three_stars_search()
